@@ -29,14 +29,39 @@ os_in_use = platform.system()
 MAMBA_DIR = Path("mm")  # micromamba install directory
 MAMBA_EXE = MAMBA_DIR / f'{"micromamba" if os_in_use == "Linux" else "micromamba.exe"}'
 MAMBA_ENVS = MAMBA_DIR / "envs"
-JOB_RUNNER = Path("minGPT") / "run_bench.py"
-# BENCHMARK_DIR = Path("resources") / "benchmarks"
+BENCH_PATH = Path.cwd() / "chargpt.py"
+ENV_NAME = "pytorch"
+
+if os_in_use == "Windows":
+    PY_PATH = f"""{MAMBA_ENVS / ENV_NAME / 'python'}"""
+else:
+    PY_PATH = f"""{MAMBA_ENVS / ENV_NAME / 'bin' / 'python'}"""
+
 
 sys_env = os.environ.copy()
 
 # ******************************************************************************
 # Utility functions
 # ******************************************************************************
+def set_py_environment(py_env_dir):
+    """A hack to workaround lame windows conda setup
+    The main run_cmd function has this as an optional arg with default None"""
+    if os_in_use == "Windows":
+        sys_env = os.environ.copy()
+        sys_env["PATH"] = str(py_env_dir) + "\\Library\\bin" + ";" + sys_env["PATH"]
+        sys_env["PATH"] = (
+            str(py_env_dir) + "\\Library\\usr\\bin" + ";" + sys_env["PATH"]
+        )
+        sys_env["PATH"] = (
+            str(py_env_dir) + "\\Library\\mingw-w64\\bin" + ";" + sys_env["PATH"]
+        )
+        sys_env["PATH"] = str(py_env_dir) + "\\Scripts" + ";" + sys_env["PATH"]
+        sys_env["PATH"] = str(py_env_dir) + ";" + sys_env["PATH"]
+    else:
+        sys_env = os.environ.copy()
+    return sys_env
+
+
 def run_cmd(cmd, sys_env=None):
     """Run command cmd in a subprocess with output polling
     capturing stdout and stderr without waiting for the output buffer to flush
@@ -55,33 +80,47 @@ def run_cmd(cmd, sys_env=None):
     return process.poll()
 
 
-def mk_minGPT_env():
-    """Create the minGPT env using micromamba"""
-    mingpt_env = {MAMBA_ENVS} / "mingpt"
-    if not mingpt_env.exists():
-        print("Creating the minGPT env")
-        mamba_cmd = f"""{MAMBA_EXE } 
-                create -p {mingpt_env} 
+mamba_cmd = f"""{MAMBA_EXE } 
+                create -p {ENV_NAME} 
                 -r {MAMBA_DIR} --yes -c pytorch -c conda-forge -c huggingface pytorch cudatoolkit=11.6 huggingface_hub transformers """
-        run_cmd(mamba_cmd.split(), sys_env)
-    return mingpt_env
 
 
-def run_benchmark(env_name, job_args, sys_env):
-    """Make the commandline args for running the benchmark jobs with the
-    correct API's python env. This is passed to subprocess.run via run_cmd()"""
-    if os_in_use == "Windows":  # Windows doesn't use a /bin
-        # spliting the arg string fails on Win even with relative paths!?
-        # benchmark_cmd = f"""{MAMBA_ENVS / env_name / 'python'} {JOB_RUNNER} {job_args} { jobs} """
-        benchmark_cmd = [MAMBA_ENVS / env_name / "python", JOB_RUNNER]
-        benchmark_cmd.extend(job_args.split())
-        # benchmark_cmd.split()
-    else:
-        benchmark_cmd = (
-            f"""{MAMBA_ENVS / env_name / 'bin' / 'python'} {JOB_RUNNER} {job_args}  """
-        )
-        benchmark_cmd.split()
-    run_cmd(benchmark_cmd, sys_env)
+def mk_bench_env(env_name=ENV_NAME, env_cmd=mamba_cmd):
+    """Create the benchmark python env using micromamba"""
+    bench_env = MAMBA_ENVS / env_name
+    if not bench_env.exists():
+        run_cmd(env_cmd.split(), sys_env)
+
+
+# def run_benchmark(env_name, job_args, sys_env):
+#     """Make the commandline args for running the benchmark jobs with the
+#     correct API's python env. This is passed to subprocess.run via run_cmd()"""
+#     if os_in_use == "Windows":  # Windows doesn't use a /bin
+#         # spliting the arg string fails on Win even with relative paths!?
+#         # benchmark_cmd = f"""{MAMBA_ENVS / env_name / 'python'} {JOB_RUNNER} {job_args} { jobs} """
+#         benchmark_cmd = [MAMBA_ENVS / env_name / "python", JOB_RUNNER]
+#         benchmark_cmd.extend(job_args.split())
+#         # benchmark_cmd.split()
+#     else:
+#         benchmark_cmd = (
+#             f"""{MAMBA_ENVS / env_name / 'bin' / 'python'} {JOB_RUNNER} {job_args}  """
+#         )
+#         benchmark_cmd.split()
+#     run_cmd(benchmark_cmd, sys_env)
+
+
+def run_chargpt(iterations, batchsize, sys_env):
+    CHARGPT_CMD = f"""{BENCH_PATH} --trainer.max_iters={iterations} --model.model_type='gpt2' --trainer.batch_size={batchsize} """
+    commandline = f"""{PY_PATH} {CHARGPT_CMD}"""
+    print(f"Running {commandline}")
+    starttime = time.time()
+    run_cmd(commandline.split(), sys_env)
+    endtime = time.time()
+    print("****************************************************************")
+    print(
+        f"* Time = {endtime-starttime:.2f} seconds for {iterations} iterations, batchsize {batchsize} "
+    )
+    print("****************************************************************")
 
 
 # ******************************************************************************
@@ -106,30 +145,31 @@ def main():
             default=32,
             help="Batch size to use for the benchmark",
         )
+        return parser.parse_args()
 
+    args = get_args()
 
-args = get_args()
+    iterations = args.iterations
+    batchsize = args.batchsize
 
-iterations = args.iterations
-batchsize = args.batchsize
+    # ******************************************************************************
+    # Print some kind of message about usage and such
+    # ******************************************************************************
+    # print(
+    #     "pugetbench-mingpt.py is the setup-and-run user interface for a  simple GPU performance benchmark using Andrej Karpathy's minGPT code."
+    # )
 
-# ******************************************************************************
-# Print some kind of message about usage and such
-# ******************************************************************************
-print(
-    "pugetbench-mingpt.py is the setup-and-run user interface for a  simple GPU performance benchmark using Andrej Karpathy's minGPT code."
-)
+    # ******************************************************************************
+    # Run micromamba to create the env needed to run minGPT
+    # ******************************************************************************
+    mk_bench_env()
 
-# ******************************************************************************
-# Run micromamba to create the env needed to run minGPT
-# ******************************************************************************
-print("Creating the minGPT environment")
-mk_minGPT_env()
+    # ******************************************************************************
+    # Run the benchmark
+    # ******************************************************************************
+    sys_env = set_py_environment(MAMBA_ENVS / ENV_NAME)
+    run_chargpt(iterations, batchsize, sys_env)
 
-# ******************************************************************************
-# Run the benchmark
-# ******************************************************************************
-run_benchmark("mingpt", f"-i {iterations} -b {batchsize}", sys_env)
 
 if __name__ == "__main__":
     main()
