@@ -11,39 +11,6 @@ Goal is to
 
 micromamba download to PWD/mm
 
-using some of these ideas
-
-```
-# ******************************************************************************
-# Global Variables
-# ******************************************************************************
-BENCHMARKS = ["matmul", "cholesky", "eig", "randn"]
-PY_ENVS = ["anaconda3", "openblas", "intel_mkl"]
-BENCHMARK_DIR = Path("resources") / "benchmarks"
-MAMBA_DIR = Path("resources") / "mm"
-MAMBA_EXE = MAMBA_DIR / f'{"micromamba" if OS_IN_USE == "Linux" else "micromamba.exe"}'
-MAMBA_ENVS = MAMBA_DIR / "envs"
-JOB_RUNNER = BENCHMARK_DIR / "np_linalg.py"
-
-
-def mk_mamba_cmd(env_name, env_args):
-    """micromamba command to create the env"""
-    mamba_cmd = f"""{MAMBA_EXE }
-                create -p {MAMBA_ENVS / env_name}
-                -r {MAMBA_DIR} --yes {env_args}"""
-    return mamba_cmd.split()
-
-```
-
-test:
-from PWD
-
-```
-mm/micromamba create -p mm/envs/pytorch -r mm -c pytorch -c conda-forge pytorch cudatoolkit=11.6
-```
-
-OK, after messing that up for an hour the above worked ... as it should :-)
-
 ## Example to use! Karpathy's minGPT
 
 The is a nice project
@@ -71,7 +38,7 @@ time python ./chargpt.py --trainer.max_iters=1000 --model.model_type='gpt2' --tr
 mm/micromamba create -p mm/envs/pytorch -r mm -c pytorch -c conda-forge -c huggingface pytorch cudatoolkit=11.6 huggingface_hub transformers
 ```
 
-That did the right thing. There is the configured python in
+That did the right thing. The configured python is in
 
 ```
 ./mm/envs/pytorch/bin/python

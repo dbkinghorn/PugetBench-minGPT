@@ -111,7 +111,7 @@ def mk_bench_env(env_name=ENV_NAME, env_cmd=mamba_cmd):
 
 def run_chargpt(iterations, batchsize, sys_env):
     CHARGPT_CMD = f"""{BENCH_PATH} --trainer.max_iters={iterations} --model.model_type='gpt2' --trainer.batch_size={batchsize} """
-    commandline = f"""{PY_PATH} {CHARGPT_CMD}"""
+    commandline = f"""{PY_PATH} -u {CHARGPT_CMD}"""
     print(f"Running {commandline}")
     starttime = time.time()
     run_cmd(commandline.split(), sys_env)
