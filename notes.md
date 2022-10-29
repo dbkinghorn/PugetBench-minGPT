@@ -82,3 +82,8 @@ user	5m15.993s
 sys	0m2.465s
 
 ```
+
+## Data Parallel
+
+switched to DP modifications made by
+Gavia Gray https://github.com/gngdb/minGPT/tree/dataparallel

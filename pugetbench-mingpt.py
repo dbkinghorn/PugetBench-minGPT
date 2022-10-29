@@ -8,7 +8,18 @@ It will,
 - Do a specified number of iterations for a training run on a GPT-2 124 Mil parameter model using tiny-shakespear (1.1MB of data)
 - The benchmark is chargpt from the projects in minGPT it trains a character-level language model.
 - The benchmark performance measure is the time needed to run 1000 training iterations. (This is a hardware benchmark, not a software benchmark)
-- The number of iterations, and batch size can be adjusted to accommodate different NVIDIA GPUs. Number of iterations should be fixed for a given hardware comparison, but the batch size can be adjusted to allow for different amounts of GPU memory. (Performance will be biased toward lager mem GPUs -- just like the real world)
+- The number of iterations, and batch size can be adjusted to accommodate different NVIDIA GPUs. Number of iterations should be fixed for a given hardware comparison, but the batch size can be adjusted to allow for different amounts of GPU memory. 
+
+Please see 
+https://github.com/karpathy/minGPT
+and
+https://github.com/gngdb/minGPT/tree/dataparallel
+
+"""
+
+"""
+Version 0.1
+Copyright (c) 2022  D B Kinghorn and Puget Systems.
 """
 
 import os
@@ -19,6 +30,7 @@ import platform
 from datetime import datetime
 import argparse
 import time
+from unittest import skip
 
 
 # ******************************************************************************
@@ -82,7 +94,7 @@ def run_cmd(cmd, sys_env=None):
 
 mamba_cmd = f"""{MAMBA_EXE } 
                 create -p {ENV_NAME} 
-                -r {MAMBA_DIR} --yes -c pytorch -c conda-forge -c huggingface pytorch cudatoolkit=11.6 huggingface_hub transformers """
+                -r {MAMBA_DIR} --yes -c pytorch -c conda-forge -c huggingface -c nvidia pytorch=1.13 pytorch-cuda=11.7 huggingface_hub transformers """
 
 
 def mk_bench_env(env_name=ENV_NAME, env_cmd=mamba_cmd):
@@ -92,25 +104,8 @@ def mk_bench_env(env_name=ENV_NAME, env_cmd=mamba_cmd):
         run_cmd(env_cmd.split(), sys_env)
 
 
-# def run_benchmark(env_name, job_args, sys_env):
-#     """Make the commandline args for running the benchmark jobs with the
-#     correct API's python env. This is passed to subprocess.run via run_cmd()"""
-#     if os_in_use == "Windows":  # Windows doesn't use a /bin
-#         # spliting the arg string fails on Win even with relative paths!?
-#         # benchmark_cmd = f"""{MAMBA_ENVS / env_name / 'python'} {JOB_RUNNER} {job_args} { jobs} """
-#         benchmark_cmd = [MAMBA_ENVS / env_name / "python", JOB_RUNNER]
-#         benchmark_cmd.extend(job_args.split())
-#         # benchmark_cmd.split()
-#     else:
-#         benchmark_cmd = (
-#             f"""{MAMBA_ENVS / env_name / 'bin' / 'python'} {JOB_RUNNER} {job_args}  """
-#         )
-#         benchmark_cmd.split()
-#     run_cmd(benchmark_cmd, sys_env)
-
-
-def run_chargpt(iterations, batchsize, sys_env):
-    CHARGPT_CMD = f"""{BENCH_PATH} --trainer.max_iters={iterations} --model.model_type='gpt2' --trainer.batch_size={batchsize} """
+def run_chargpt(iterations, batchsize, parallel, sys_env):
+    CHARGPT_CMD = f"""{BENCH_PATH} --trainer.max_iters={iterations} --model.model_type='gpt2' --trainer.batch_size={batchsize} --trainer.data_parallel={parallel}"""
     commandline = f"""{PY_PATH} -u {CHARGPT_CMD}"""
     print(f"Running {commandline}")
     starttime = time.time()
@@ -129,7 +124,7 @@ def run_chargpt(iterations, batchsize, sys_env):
 def main():
     def get_args():
         parser = argparse.ArgumentParser(
-            description="pugetbench-mingpt.py is the setup user interface for a  simple GPU performance benchmark using Andrej Karpathy's minGPT code."
+            description="pugetbench-mingpt.py is the setup-and-run user interface for a  simple GPU performance benchmark using Andrej Karpathy's minGPT code."
         )
         parser.add_argument(
             "-i",
@@ -145,19 +140,68 @@ def main():
             default=32,
             help="Batch size to use for the benchmark",
         )
+        parser.add_argument(
+            "-p",
+            "--parallel",
+            type=bool,
+            default=True,
+            action=argparse.BooleanOptionalAction,
+            help="-p | --parallel | --no-parallel  Run the benchmark in parallel on multiple GPUs, use CUDA_VISIBLE_DEVICES to control which GPUs are used",
+        )
+        parser.add_argument(
+            "-y",
+            "--yes",
+            type=bool,
+            default=False,
+            action=argparse.BooleanOptionalAction,
+            help="-y | --yes Skip the confirmation prompt",
+        )
         return parser.parse_args()
 
     args = get_args()
 
     iterations = args.iterations
     batchsize = args.batchsize
+    parallel = args.parallel
+    skip_confirm = args.yes
 
     # ******************************************************************************
-    # Print some kind of message about usage and such
+    # Print some kind of message about usage unless -q is specified
     # ******************************************************************************
-    # print(
-    #     "pugetbench-mingpt.py is the setup-and-run user interface for a  simple GPU performance benchmark using Andrej Karpathy's minGPT code."
-    # )
+
+    if not skip_confirm:
+
+        print(
+            """ 
+        ****************************************************************
+        A simple GPU Transformer training performance benchmark using 
+        Andrej Karpathy's minGPT code (modified for multi-GPU).
+        https://github.com/karpathy/minGPT
+
+        By default pugetbench-mingpt will do 1000 iterations of training 
+        on a GPT-2 model with a batch size of 32
+
+        Use a smaller batch size for GPUs with less than 10GB memory
+
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        !! WARNING the program will do a one-time PyTorch env setup using 
+        !! approx. 8.5GB of disk space after an approx. 5GB download.
+        !! This may take several minutes but will not be repeated unless
+        !! you delete the env directory.
+        !!
+        !! Everything will be contained in the application directory.
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+         
+         To completely remove the benchmark just delete the application directory
+
+         Use --help for options
+        ****************************************************************"""
+        )
+
+        while input("Do you want to continue? (y/n): ").lower() != "y":
+            print("Exiting")
+            sys.exit()
+    # end of skip_confirm
 
     # ******************************************************************************
     # Run micromamba to create the env needed to run minGPT
@@ -168,7 +212,7 @@ def main():
     # Run the benchmark
     # ******************************************************************************
     sys_env = set_py_environment(MAMBA_ENVS / ENV_NAME)
-    run_chargpt(iterations, batchsize, sys_env)
+    run_chargpt(iterations, batchsize, parallel, sys_env)
 
 
 if __name__ == "__main__":

@@ -123,7 +123,7 @@ if __name__ == "__main__":
             model.eval()
             with torch.no_grad():
                 # sample from the model...
-                context = "O God, O God!"
+                # context = "O God, O God!"
                 context = "be still and wonder"
                 x = torch.tensor(
                     [train_dataset.stoi[s] for s in context], dtype=torch.long
