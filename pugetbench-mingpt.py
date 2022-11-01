@@ -214,6 +214,10 @@ def main():
     sys_env = set_py_environment(MAMBA_ENVS / ENV_NAME)
     run_chargpt(iterations, batchsize, parallel, sys_env)
 
+    if os_in_use == "Windows":
+        print("Press Enter to exit")
+        input()
+
 
 if __name__ == "__main__":
     main()
