@@ -3,7 +3,7 @@
 Goal is to
 
 - make a local env for pytorch using micromamba
-- run a Transform benchmark in that
+- run a Transformer benchmark in that
 - do this stand alone
 - use pyinstaller to make a minimal exe that will build the env and run the benchmark
 
