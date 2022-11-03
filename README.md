@@ -56,3 +56,23 @@ options:
 The tar.gz or zip file in Releases will decompress to a directory that contains the `pugetbench-mingpt` or `pugetbench-mingpt.exe` executable along with all other assets needed to run. **The env for the job run (8.5GB) will be created locally in this same directory on first run. Nothing is installed outside of this directory.** To remove just delete the directory.
 
 **On Windows:** The .exe will open and execute in CMD when double clicked, however you would not be able to change any options before start. **It is recommended to use PowerShell to run the benchmark.**
+
+### To get started ...
+
+There is a zip file for Windows and tar.gz file for Linux under releases https://github.com/dbkinghorn/PugetBench-minGPT/releases
+
+To run:
+
+- Download and unzip/untar the release
+- open PowerShell or bash and cd to that uncompressed directory (there is a redundant nested dir on the zip, sorry about that )
+
+Then do
+
+- ./pugetbench-mingpt.exe --help to see options
+- ./pugetbench-mingpt.exe to run with defaults on a GPU with at least 10GB mem
+- ./pugetbench-mingpt.exe -b 24 (or16) for smaller mem GPUs
+- ./pugetbench-mingpt.exe -i 5010 to see it actually get to where it has learned a little old-English and writes something like Shakespeare :-)
+- ./pugetbench-mingpt.exe --no-parallel if you only want 1 GPU on a multi-GPU system. It runs data-parallel on multi-GPU by default
+- --yes or -y bypasses the annoying warning about the 3GB download and 10GB expanded setup
+  The first run takes some time to download and setup the environment to run the code
+- To remove just delete the directory
